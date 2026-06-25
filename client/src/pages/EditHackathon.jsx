@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import API from '../services/api';
 import { useNavigate, useParams, Link } from 'react-router-dom';
+import { getHackathons, updateHackathon } from '../services/localStorage';
 
 const EditHackathon = () => {
     const { id } = useParams();
@@ -33,7 +33,7 @@ const EditHackathon = () => {
     useEffect(() => {
         const fetchHackathon = async () => {
             try {
-                const { data } = await API.get('/hackathons');
+                const data = getHackathons();
                 const hackathon = data.find(h => h._id === id);
                 if (hackathon) {
                     setName(hackathon.name);
@@ -84,12 +84,12 @@ const EditHackathon = () => {
                 payload.pptDeadline = new Date(new Date(regDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
             }
 
-            await API.put(`/hackathons/${id}`, payload);
+            updateHackathon(id, payload);
             setSuccessMessage('Hackathon updated successfully! Redirecting...');
             setTimeout(() => navigate('/'), 1500);
         } catch (e) {
             console.error(e);
-            setError(e.response?.data?.message || 'Failed to update hackathon');
+            setError('Failed to update hackathon. Please try again.');
         } finally {
             setSaving(false);
         }

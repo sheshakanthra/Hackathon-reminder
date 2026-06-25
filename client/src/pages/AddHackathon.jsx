@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import API from '../services/api';
-import { useNavigate, Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { useNavigate, Link, useLocation as useRouterLocation } from 'react-router-dom';
+import { saveHackathon } from '../services/localStorage';
 
 const AddHackathon = () => {
     const [name, setName] = useState('');
@@ -15,9 +15,39 @@ const AddHackathon = () => {
     const [priority, setPriority] = useState('Medium');
     const [notificationsEnabled, setNotificationsEnabled] = useState(false);
     const navigate = useNavigate();
+    const routerLocation = useRouterLocation();
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [successMessage, setSuccessMessage] = useState('');
+
+    /** Convert an ISO 8601 string to the YYYY-MM-DDTHH:MM format required by datetime-local inputs */
+    const toDatetimeLocal = (isoStr) => {
+        if (!isoStr) return '';
+        try {
+            const d = new Date(isoStr);
+            if (isNaN(d)) return '';
+            const offset = d.getTimezoneOffset();
+            const local  = new Date(d.getTime() - offset * 60000);
+            return local.toISOString().slice(0, 16);
+        } catch { return ''; }
+    };
+
+    // Pre-fill from AI URL extraction (navigation state set by UrlExtractBar)
+    useEffect(() => {
+        const prefill = routerLocation.state?.prefill;
+        if (!prefill) return;
+        if (prefill.name)                  setName(prefill.name);
+        if (prefill.location)              setLocation(prefill.location);
+        if (prefill.prize_pool)            setPrize(prefill.prize_pool);
+        if (prefill.description)           setDescription(prefill.description);
+        if (prefill.category)              setCategory(prefill.category);
+        if (prefill.priority)              setPriority(prefill.priority);
+        if (prefill.registration_deadline) setRegDate(toDatetimeLocal(prefill.registration_deadline));
+        if (prefill.submission_deadline) {
+            setPptDate(toDatetimeLocal(prefill.submission_deadline));
+            setIncludePpt(true);
+        }
+    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -35,6 +65,7 @@ const AddHackathon = () => {
                 description: description || '',
                 category: category || 'Web Development',
                 priority: priority || 'Medium',
+                status: 'registered',
                 notificationsEnabled: false,
             };
 
@@ -44,12 +75,12 @@ const AddHackathon = () => {
                 payload.pptDeadline = new Date(new Date(regDate).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
             }
 
-            await API.post('/hackathons', payload);
+            saveHackathon(payload);
             setSuccessMessage('Hackathon added successfully! Redirecting...');
             setTimeout(() => navigate('/'), 1500);
         } catch (e) {
             console.error(e);
-            setError(e.response?.data?.message || 'Failed to add hackathon');
+            setError('Failed to add hackathon. Please try again.');
         } finally {
             setLoading(false);
         }
@@ -106,6 +137,16 @@ const AddHackathon = () => {
                                         </div>
                                     </div>
                                 )}
+                            </div>
+                        )}
+
+                        {/* AI Pre-fill Notice */}
+                        {routerLocation.state?.prefill && !error && !successMessage && (
+                            <div className="px-8 pt-5">
+                                <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 text-indigo-800 px-5 py-3 rounded-2xl text-sm font-semibold">
+                                    <span className="text-indigo-500 text-base">✦</span>
+                                    Form pre-filled via AI extraction — review the details before saving.
+                                </div>
                             </div>
                         )}
 
